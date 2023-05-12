@@ -17,6 +17,7 @@ package githubapp
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"sync/atomic"
 	"time"
 
@@ -169,9 +170,10 @@ func (s *scheduler) safeExecute(ctx context.Context, d Dispatch) {
 		atomic.AddInt64(&s.activeWorkers, -1)
 		if r := recover(); r != nil {
 			if rerr, ok := r.(error); ok {
-				err = rerr
+				debug.Stack()
+				err = errors.WithStack(rerr)
 			} else {
-				err = fmt.Errorf("%v", r)
+				err = errors.WithStack(fmt.Errorf("%v", r))
 			}
 		}
 		if err != nil && s.onError != nil {
