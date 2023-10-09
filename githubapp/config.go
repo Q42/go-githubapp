@@ -17,6 +17,8 @@ package githubapp
 import (
 	"os"
 	"strconv"
+
+	"github.com/pkg/errors"
 )
 
 type Config struct {
@@ -47,6 +49,13 @@ func (c *Config) SetValuesFromEnv(prefix string) {
 	setIntFromEnv("GITHUB_APP_INTEGRATION_ID", prefix, &c.App.IntegrationID)
 	setStringFromEnv("GITHUB_APP_WEBHOOK_SECRET", prefix, &c.App.WebhookSecret)
 	setStringFromEnv("GITHUB_APP_PRIVATE_KEY", prefix, &c.App.PrivateKey)
+	if file, hasFileEnv := os.LookupEnv("GITHUB_APP_PRIVATE_KEY_FILE"); hasFileEnv {
+		data, err := os.ReadFile(file)
+		if err != nil {
+			panic(errors.Wrapf(err, "failed reading %q", file))
+		}
+		c.App.PrivateKey = string(data)
+	}
 
 	setStringFromEnv("GITHUB_OAUTH_CLIENT_ID", prefix, &c.OAuth.ClientID)
 	setStringFromEnv("GITHUB_OAUTH_CLIENT_SECRET", prefix, &c.OAuth.ClientSecret)

@@ -17,15 +17,26 @@ package githubapp
 import (
 	"fmt"
 
-	"github.com/google/go-github/v33/github"
+	"github.com/google/go-github/v55/github"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
 	"github.com/shurcooL/githubv4"
+	"golang.org/x/oauth2"
 )
 
 const (
 	DefaultCachingClientCapacity = 64
 )
+
+type clientTokenSource struct {
+	client      *github.Client
+	tokenSource TokenSource
+}
+
+type clientV4TokenSource struct {
+	client      *githubv4.Client
+	tokenSource TokenSource
+}
 
 // NewDefaultCachingClientCreator returns a ClientCreator using values from the
 // configuration or other defaults.
@@ -70,42 +81,47 @@ func (c *cachingClientCreator) NewAppV4Client() (*githubv4.Client, error) {
 	return c.delegate.NewAppV4Client()
 }
 
-func (c *cachingClientCreator) NewInstallationClient(installationID int64) (*github.Client, error) {
+func (c *cachingClientCreator) NewInstallationClient(installationID int64) (*github.Client, TokenSource, error) {
 	// if client is in cache, return it
 	key := c.toCacheKey("v3", installationID)
 	val, ok := c.cachedClients.Get(key)
 	if ok {
-		if client, ok := val.(*github.Client); ok {
-			return client, nil
+		if cts, ok := val.(clientTokenSource); ok {
+			return cts.client, cts.tokenSource, nil
 		}
 	}
 
 	// otherwise, create and return
-	client, err := c.delegate.NewInstallationClient(installationID)
+	client, ts, err := c.delegate.NewInstallationClient(installationID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	c.cachedClients.Add(key, client)
-	return client, nil
+	c.cachedClients.Add(key, clientTokenSource{client, ts})
+	return client, ts, nil
 }
 
-func (c *cachingClientCreator) NewInstallationV4Client(installationID int64) (*githubv4.Client, error) {
+func (c *cachingClientCreator) NewInstallationV4Client(installationID int64) (*githubv4.Client, TokenSource, error) {
 	// if client is in cache, return it
 	key := c.toCacheKey("v4", installationID)
 	val, ok := c.cachedClients.Get(key)
 	if ok {
-		if client, ok := val.(*githubv4.Client); ok {
-			return client, nil
+		if cts, ok := val.(clientV4TokenSource); ok {
+			return cts.client, cts.tokenSource, nil
 		}
 	}
 
 	// otherwise, create and return
-	client, err := c.delegate.NewInstallationV4Client(installationID)
+	client, ts, err := c.delegate.NewInstallationV4Client(installationID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	c.cachedClients.Add(key, client)
-	return client, nil
+	c.cachedClients.Add(key, clientV4TokenSource{client, ts})
+	return client, ts, nil
+}
+
+func (c *cachingClientCreator) NewTokenSourceClient(ts oauth2.TokenSource) (*github.Client, error) {
+	// token clients are not cached
+	return c.delegate.NewTokenSourceClient(ts)
 }
 
 func (c *cachingClientCreator) NewTokenClient(token string) (*github.Client, error) {
@@ -116,6 +132,11 @@ func (c *cachingClientCreator) NewTokenClient(token string) (*github.Client, err
 func (c *cachingClientCreator) NewTokenV4Client(token string) (*githubv4.Client, error) {
 	// token clients are not cached
 	return c.delegate.NewTokenV4Client(token)
+}
+
+func (c *cachingClientCreator) NewTokenSourceV4Client(ts oauth2.TokenSource) (*githubv4.Client, error) {
+	// token clients are not cached
+	return c.delegate.NewTokenSourceV4Client(ts)
 }
 
 func (c *cachingClientCreator) toCacheKey(apiVersion string, installationID int64) string {

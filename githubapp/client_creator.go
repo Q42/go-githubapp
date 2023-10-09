@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bradleyfalzon/ghinstallation"
-	"github.com/google/go-github/v33/github"
+	"github.com/bradleyfalzon/ghinstallation/v2"
+	"github.com/google/go-github/v55/github"
 	"github.com/gregjones/httpcache"
 	"github.com/pkg/errors"
 	"github.com/shurcooL/githubv4"
@@ -75,10 +75,16 @@ type ClientCreator interface {
 	//  * the installation ID is the ID that is shown in the URL of https://{githubURL}/settings/installations/{#}
 	//      (navigate to the "installations" page without the # and go to the app's page to see the number)
 	//  * the key bytes must be a PEM-encoded PKCS1 or PKCS8 private key for the application
-	NewInstallationClient(installationID int64) (*github.Client, error)
+	NewInstallationClient(installationID int64) (*github.Client, TokenSource, error)
 
 	// NewInstallationV4Client returns an installation-authenticated v4 API client, similar to NewInstallationClient.
-	NewInstallationV4Client(installationID int64) (*githubv4.Client, error)
+	NewInstallationV4Client(installationID int64) (*githubv4.Client, TokenSource, error)
+
+	// NewTokenSourceClient returns a *github.Client that uses the passed in OAuth token source for authentication.
+	NewTokenSourceClient(ts oauth2.TokenSource) (*github.Client, error)
+
+	// NewTokenSourceClient returns a *githubv4.Client that uses the passed in OAuth token source for authentication.
+	NewTokenSourceV4Client(ts oauth2.TokenSource) (*githubv4.Client, error)
 
 	// NewTokenClient returns a *github.Client that uses the passed in OAuth token for authentication.
 	NewTokenClient(token string) (*github.Client, error)
@@ -129,6 +135,7 @@ type clientCreator struct {
 	cacheFunc      func() httpcache.Cache
 	alwaysValidate bool
 	timeout        time.Duration
+	transport      http.RoundTripper
 }
 
 var _ ClientCreator = &clientCreator{}
@@ -172,6 +179,15 @@ func WithClientMiddleware(middleware ...ClientMiddleware) ClientOption {
 	}
 }
 
+// WithTransport sets the http.RoundTripper used to make requests. Clients can
+// provide an http.Transport instance to modify TLS, proxy, or timeout options.
+// By default, clients use http.DefaultTransport.
+func WithTransport(transport http.RoundTripper) ClientOption {
+	return func(c *clientCreator) {
+		c.transport = transport
+	}
+}
+
 func (c *clientCreator) NewAppClient() (*github.Client, error) {
 	base := c.newHTTPClient()
 	installation, transportError := newAppInstallation(c.integrationID, c.privKeyBytes, c.v3BaseURL)
@@ -209,9 +225,9 @@ func (c *clientCreator) NewAppV4Client() (*githubv4.Client, error) {
 	return client, nil
 }
 
-func (c *clientCreator) NewInstallationClient(installationID int64) (*github.Client, error) {
+func (c *clientCreator) NewInstallationClient(installationID int64) (*github.Client, TokenSource, error) {
 	base := c.newHTTPClient()
-	installation, transportError := newInstallation(c.integrationID, installationID, c.privKeyBytes, c.v3BaseURL)
+	installation, ghTransport, transportError := newInstallation(c.integrationID, installationID, c.privKeyBytes, c.v3BaseURL)
 
 	middleware := []ClientMiddleware{installation}
 	if c.cacheFunc != nil {
@@ -220,17 +236,17 @@ func (c *clientCreator) NewInstallationClient(installationID int64) (*github.Cli
 
 	client, err := c.newClient(base, middleware, fmt.Sprintf("installation: %d", installationID), installationID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if *transportError != nil {
-		return nil, *transportError
+		return nil, nil, *transportError
 	}
-	return client, nil
+	return client, *ghTransport, nil
 }
 
-func (c *clientCreator) NewInstallationV4Client(installationID int64) (*githubv4.Client, error) {
+func (c *clientCreator) NewInstallationV4Client(installationID int64) (*githubv4.Client, TokenSource, error) {
 	base := c.newHTTPClient()
-	installation, transportError := newInstallation(c.integrationID, installationID, c.privKeyBytes, c.v3BaseURL)
+	installation, ghTransport, transportError := newInstallation(c.integrationID, installationID, c.privKeyBytes, c.v3BaseURL)
 
 	// The v4 API primarily uses POST requests (except for introspection queries)
 	// which we cannot cache, so don't construct the middleware
@@ -238,16 +254,24 @@ func (c *clientCreator) NewInstallationV4Client(installationID int64) (*githubv4
 
 	client, err := c.newV4Client(base, middleware, fmt.Sprintf("installation: %d", installationID))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if *transportError != nil {
-		return nil, *transportError
+		return nil, nil, *transportError
 	}
-	return client, nil
+	return client, *ghTransport, nil
+}
+
+type TokenSource interface {
+	Token(ctx context.Context) (string, error)
 }
 
 func (c *clientCreator) NewTokenClient(token string) (*github.Client, error) {
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
+	return c.NewTokenSourceClient(ts)
+}
+
+func (c *clientCreator) NewTokenSourceClient(ts oauth2.TokenSource) (*github.Client, error) {
 	tc := oauth2.NewClient(context.Background(), ts)
 
 	middleware := []ClientMiddleware{}
@@ -260,6 +284,10 @@ func (c *clientCreator) NewTokenClient(token string) (*github.Client, error) {
 
 func (c *clientCreator) NewTokenV4Client(token string) (*githubv4.Client, error) {
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
+	return c.NewTokenSourceV4Client(ts)
+}
+
+func (c *clientCreator) NewTokenSourceV4Client(ts oauth2.TokenSource) (*githubv4.Client, error) {
 	tc := oauth2.NewClient(context.Background(), ts)
 	// The v4 API primarily uses POST requests (except for introspection queries)
 	// which we cannot cache, so don't construct the middleware
@@ -267,8 +295,15 @@ func (c *clientCreator) NewTokenV4Client(token string) (*githubv4.Client, error)
 }
 
 func (c *clientCreator) newHTTPClient() *http.Client {
+	transport := c.transport
+	if transport == nil {
+		// While http.Client will use the default when given a a nil transport,
+		// we assume a non-nil transport when applying middleware
+		transport = http.DefaultTransport
+	}
+
 	return &http.Client{
-		Transport: http.DefaultTransport,
+		Transport: transport,
 		Timeout:   c.timeout,
 	}
 }
@@ -334,19 +369,22 @@ func newAppInstallation(integrationID int64, privKeyBytes []byte, v3BaseURL stri
 	return installation, &transportError
 }
 
-func newInstallation(integrationID, installationID int64, privKeyBytes []byte, v3BaseURL string) (ClientMiddleware, *error) {
+func newInstallation(integrationID, installationID int64, privKeyBytes []byte, v3BaseURL string) (ClientMiddleware, **ghinstallation.Transport, *error) {
 	var transportError error
+	var itr *ghinstallation.Transport
 	installation := func(next http.RoundTripper) http.RoundTripper {
-		itr, err := ghinstallation.New(next, integrationID, installationID, privKeyBytes)
+		var err error
+		itr, err = ghinstallation.New(next, integrationID, installationID, privKeyBytes)
 		if err != nil {
 			transportError = err
+
 			return next
 		}
 		// leaving the v3 URL since this is used to refresh the token, not make queries
 		itr.BaseURL = strings.TrimSuffix(v3BaseURL, "/")
 		return itr
 	}
-	return installation, &transportError
+	return installation, &itr, &transportError
 }
 
 func cache(cacheFunc func() httpcache.Cache) ClientMiddleware {
