@@ -1,22 +1,53 @@
 module github.com/palantir/go-githubapp
 
-go 1.13
+go 1.21
 
 require (
 	github.com/alexedwards/scs v1.4.1
-	github.com/bradleyfalzon/ghinstallation v1.1.1
-	github.com/go-git/go-git/v5 v5.3.0 // indirect
-	github.com/google/go-github/v29 v29.0.3 // indirect
-	github.com/google/go-github/v33 v33.0.0
+	github.com/bradleyfalzon/ghinstallation/v2 v2.6.0
+	github.com/go-git/go-git/v5 v5.9.0
+	github.com/google/go-github/v55 v55.0.0
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79
-	github.com/hashicorp/golang-lru v0.5.4
-	github.com/palantir/go-baseapp v0.2.3
+	github.com/hashicorp/golang-lru v0.6.0
+	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1
-	github.com/rcrowley/go-metrics v0.0.0-20200313005456-10cdbea86bc0
-	github.com/rs/zerolog v1.18.0
-	github.com/shurcooL/githubv4 v0.0.0-20191127044304-8f68eb5628d0
+	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
+	github.com/rs/zerolog v1.30.0
+	github.com/shurcooL/githubv4 v0.0.0-20230704064427-599ae7bbf278
+	golang.org/x/oauth2 v0.11.0
+	gopkg.in/yaml.v2 v2.4.0
+)
+
+require (
+	dario.cat/mergo v1.0.0 // indirect
+	github.com/Microsoft/go-winio v0.6.1 // indirect
+	github.com/ProtonMail/go-crypto v0.0.0-20230828082145-3c4c8a2d2371 // indirect
+	github.com/acomagu/bufpipe v1.0.4 // indirect
+	github.com/cloudflare/circl v1.3.3 // indirect
+	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
+	github.com/emirpasic/gods v1.18.1 // indirect
+	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
+	github.com/go-git/go-billy/v5 v5.5.0 // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
+	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
+	github.com/golang/protobuf v1.5.3 // indirect
+	github.com/google/go-github/v53 v53.2.0 // indirect
+	github.com/google/go-querystring v1.1.0 // indirect
+	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
+	github.com/kevinburke/ssh_config v1.2.0 // indirect
+	github.com/mattn/go-colorable v0.1.12 // indirect
+	github.com/mattn/go-isatty v0.0.14 // indirect
+	github.com/pjbgf/sha1cd v0.3.0 // indirect
+	github.com/sergi/go-diff v1.1.0 // indirect
 	github.com/shurcooL/graphql v0.0.0-20181231061246-d48a9a75455f // indirect
-	goji.io v2.0.2+incompatible
-	golang.org/x/oauth2 v0.0.0-20210113205817-d3ed898aa8a3
-	gopkg.in/yaml.v2 v2.3.0
+	github.com/skeema/knownhosts v1.2.0 // indirect
+	github.com/xanzy/ssh-agent v0.3.3 // indirect
+	golang.org/x/crypto v0.13.0 // indirect
+	golang.org/x/mod v0.12.0 // indirect
+	golang.org/x/net v0.15.0 // indirect
+	golang.org/x/sys v0.12.0 // indirect
+	golang.org/x/tools v0.13.0 // indirect
+	google.golang.org/appengine v1.6.7 // indirect
+	google.golang.org/protobuf v1.31.0 // indirect
+	gopkg.in/warnings.v0 v0.1.2 // indirect
 )
