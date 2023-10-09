@@ -69,7 +69,9 @@ func (h *PRReviewHandler) Handle(ctx context.Context, eventType, deliveryID stri
 		return err
 	}
 	token, err := ts.Token(context.Background())
-
+	if err != nil {
+		return err
+	}
 	// Clone the repository
 	tokenAuth := &transport_http.BasicAuth{Username: "x-access-token", Password: token}
 	storer := memory.NewStorage()
@@ -77,7 +79,9 @@ func (h *PRReviewHandler) Handle(ctx context.Context, eventType, deliveryID stri
 		URL:  "https://github.com/palantir/go-githubapp.git",
 		Auth: tokenAuth,
 	})
-
+	if err != nil {
+		return err
+	}
 	// Insert your own advanced Git scenario here:
 	mainRef, _ := gitRepo.Reference(plumbing.NewBranchReferenceName(event.GetRepo().GetMasterBranch()), true)
 	commit, _ := gitRepo.CommitObject(mainRef.Hash())
