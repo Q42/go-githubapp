@@ -16,8 +16,6 @@ package githubapp
 
 import (
 	"context"
-	"fmt"
-	"runtime/debug"
 	"sync/atomic"
 	"time"
 

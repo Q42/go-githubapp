@@ -20,13 +20,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/go-github/v33/github"
-	"github.com/palantir/go-githubapp/githubapp"
-
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	transport_http "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/storage/memory"
+	"github.com/google/go-github/v55/github"
+	"github.com/palantir/go-githubapp/githubapp"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 )
